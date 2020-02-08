@@ -21,7 +21,6 @@ extern "C" {
 #include "esp_modem_dte.h"
 #include "esp_event.h"
 #include "driver/uart.h"
-#include "esp_modem_compat.h"
 
 /**
  * @brief Declare Event Base for ESP Modem

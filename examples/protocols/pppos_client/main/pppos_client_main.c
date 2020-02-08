@@ -16,8 +16,7 @@
 #include "esp_modem_netif.h"
 #include "esp_log.h"
 #include "sim800.h"
-#include "bg96.h"
-
+#include "driver/gpio.h"
 #define BROKER_URL "mqtt://mqtt.eclipse.org"
 
 static const char *TAG = "pppos_example";
@@ -25,6 +24,15 @@ static EventGroupHandle_t event_group = NULL;
 static const int CONNECT_BIT = BIT0;
 static const int STOP_BIT = BIT1;
 static const int GOT_DATA_BIT = BIT2;
+
+// TTGO T-Call pin definitions
+#define MODEM_RST            GPIO_NUM_5
+#define MODEM_PWKEY          GPIO_NUM_4
+#define MODEM_POWER_ON       GPIO_NUM_23
+#define MODEM_TX             GPIO_NUM_27
+#define MODEM_RX             GPIO_NUM_26
+#define I2C_SDA              GPIO_NUM_21
+#define I2C_SCL              GPIO_NUM_22
 
 #if CONFIG_EXAMPLE_SEND_MSG
 /**
@@ -206,8 +214,50 @@ static void on_ip_event(void *arg, esp_event_base_t event_base,
     }
 }
 
+
+//// TTGO T-Call pin definitions
+//#define MODEM_RST            5
+//#define MODEM_PWKEY          4
+//#define MODEM_POWER_ON       23
+//#define MODEM_TX             27
+//#define MODEM_RX             26
+//#define I2C_SDA              21
+//#define I2C_SCL              22
+// Set-up modem reset, enable, power pins
+//pinMode(MODEM_PWKEY, OUTPUT);
+//pinMode(MODEM_RST, OUTPUT);
+//pinMode(MODEM_POWER_ON, OUTPUT);
+//
+//digitalWrite(MODEM_PWKEY, LOW);
+//digitalWrite(MODEM_RST, HIGH);
+//digitalWrite(MODEM_POWER_ON, HIGH);
+
+
+void enable_pwrkey(void) {
+    ESP_LOGI(TAG, "Enabling PWRKEY");
+    ESP_ERROR_CHECK(gpio_set_direction(MODEM_RST, GPIO_MODE_OUTPUT));
+    ESP_ERROR_CHECK(gpio_set_direction(MODEM_PWKEY, GPIO_MODE_OUTPUT));
+    ESP_ERROR_CHECK(gpio_set_direction(MODEM_POWER_ON, GPIO_MODE_OUTPUT));
+
+    ESP_ERROR_CHECK(gpio_set_level(MODEM_PWKEY, 0)); // PWRKEY low
+//    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    ESP_ERROR_CHECK(gpio_set_level(MODEM_RST, 1)); // RESET high
+
+    ESP_ERROR_CHECK(gpio_set_level(MODEM_POWER_ON, 1)); // PWKEY high
+
+
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+//
+//
+//    ESP_ERROR_CHECK(gpio_set_pull_mode(GPIO_NUM_27, GPIO_PULLUP_ONLY));
+
+    ESP_LOGI(TAG, "Enabling PWRKEY ... done");
+}
+
 void app_main(void)
 {
+    enable_pwrkey();
+
 #if CONFIG_LWIP_PPP_PAP_SUPPORT
     esp_netif_auth_type_t auth_type = NETIF_PPP_AUTHTYPE_PAP;
 #elif CONFIG_LWIP_PPP_CHAP_SUPPORT
@@ -235,6 +285,11 @@ void app_main(void)
     /* create dce object */
 #if CONFIG_EXAMPLE_MODEM_DEVICE_SIM800
     modem_dce_t *dce = sim800_init(dte);
+    if (dce == NULL) {
+        ESP_LOGE(TAG, "SIM 800 initialization failed");
+        return;
+    }
+
 #elif CONFIG_EXAMPLE_MODEM_DEVICE_BG96
     modem_dce_t *dce = bg96_init(dte);
 #else
@@ -272,6 +327,7 @@ void app_main(void)
     esp_mqtt_client_start(mqtt_client);
     xEventGroupWaitBits(event_group, GOT_DATA_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
     esp_mqtt_client_destroy(mqtt_client);
+    ESP_LOGI(TAG, "Stopping modem ...");
     /* Exit PPP mode */
     ESP_ERROR_CHECK(esp_modem_stop_ppp(dte));
     /* Destroy the netif adapter withe events, which internally frees also the esp-netif instance */

@@ -50,7 +50,7 @@ typedef struct modem_dte modem_dte_t;
  * @brief Specific Timeout Constraint, Unit: millisecond
  *
  */
-#define MODEM_COMMAND_TIMEOUT_DEFAULT (500)      /*!< Default timeout value for most commands */
+#define MODEM_COMMAND_TIMEOUT_DEFAULT (5000)      /*!< Default timeout value for most commands */
 #define MODEM_COMMAND_TIMEOUT_OPERATOR (75000)   /*!< Timeout value for getting operator status */
 #define MODEM_COMMAND_TIMEOUT_MODE_CHANGE (3000) /*!< Timeout value for changing working mode */
 #define MODEM_COMMAND_TIMEOUT_HANG_UP (90000)    /*!< Timeout value for hang up */

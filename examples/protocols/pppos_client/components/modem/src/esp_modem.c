@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
+#include <driver/gpio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -86,6 +87,7 @@ static esp_err_t esp_dte_handle_line(esp_modem_dte_t *esp_dte)
     const char *line = (const char *)(esp_dte->buffer);
     /* Skip pure "\r\n" lines */
     if (strlen(line) > 2) {
+        ESP_LOGI("pppos_example", "modem>>: %s", line);
         MODEM_CHECK(dce->handle_line, "no handler for line", err_handle);
         MODEM_CHECK(dce->handle_line(dce, line) == ESP_OK, "handle line failed", err_handle);
     }
@@ -216,7 +218,13 @@ static esp_err_t esp_modem_dte_send_cmd(modem_dte_t *dte, const char *command, u
     /* Reset runtime information */
     dce->state = MODEM_STATE_PROCESSING;
     /* Send command via UART */
-    uart_write_bytes(esp_dte->uart_port, command, strlen(command));
+    int bytesWritten = uart_write_bytes(esp_dte->uart_port, command, strlen(command));
+
+    if (bytesWritten <= 0) {
+        return ESP_FAIL;
+    }
+    ESP_LOGI("pppos_example", "modem<<: %s", command);
+
     /* Check timeout */
     MODEM_CHECK(xSemaphoreTake(esp_dte->process_sem, pdMS_TO_TICKS(timeout)) == pdTRUE, "process command timeout", err);
     ret = ESP_OK;
@@ -374,6 +382,9 @@ modem_dte_t *esp_modem_dte_init(const esp_modem_dte_config_t *config)
     esp_dte->parent.process_cmd_done = esp_modem_dte_process_cmd_done;
     esp_dte->parent.deinit = esp_modem_dte_deinit;
 
+
+    ESP_ERROR_CHECK(gpio_pullup_en(CONFIG_EXAMPLE_UART_MODEM_RX_PIN));
+
     /* Config UART */
     uart_config_t uart_config = {
         .baud_rate = config->baud_rate,
@@ -391,7 +402,7 @@ modem_dte_t *esp_modem_dte_init(const esp_modem_dte_config_t *config)
     MODEM_CHECK(uart_param_config(esp_dte->uart_port, &uart_config) == ESP_OK, "config uart parameter failed", err_uart_config);
     if (config->flow_control == MODEM_FLOW_CONTROL_HW) {
         res = uart_set_pin(esp_dte->uart_port, CONFIG_EXAMPLE_UART_MODEM_TX_PIN, CONFIG_EXAMPLE_UART_MODEM_RX_PIN,
-                           CONFIG_EXAMPLE_UART_MODEM_RTS_PIN, CONFIG_EXAMPLE_UART_MODEM_CTS_PIN);
+                           -1, -1);
     } else {
         res = uart_set_pin(esp_dte->uart_port, CONFIG_EXAMPLE_UART_MODEM_TX_PIN, CONFIG_EXAMPLE_UART_MODEM_RX_PIN,
                            UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);

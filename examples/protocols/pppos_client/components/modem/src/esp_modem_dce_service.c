@@ -32,6 +32,7 @@ static const char *DCE_TAG = "dce_service";
 
 esp_err_t esp_modem_dce_handle_response_default(modem_dce_t *dce, const char *line)
 {
+    ESP_LOGI("ppoes_example", "Default handling: %s", line);
     esp_err_t err = ESP_FAIL;
     if (strstr(line, MODEM_RESULT_CODE_SUCCESS)) {
         err = esp_modem_process_command_done(dce, MODEM_STATE_SUCCESS);

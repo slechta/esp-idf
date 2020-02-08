@@ -183,12 +183,16 @@ static esp_err_t sim800_handle_cimi(modem_dce_t *dce, const char *line)
  */
 static esp_err_t sim800_handle_cops(modem_dce_t *dce, const char *line)
 {
+    ESP_LOGI("ppoes_example", "Handling sim800_handle_cops: %s", line);
     esp_err_t err = ESP_FAIL;
     if (strstr(line, MODEM_RESULT_CODE_SUCCESS)) {
+        ESP_LOGI("ppoes_example", "Handling sim800_handle_cops #1: %s", line);
         err = esp_modem_process_command_done(dce, MODEM_STATE_SUCCESS);
     } else if (strstr(line, MODEM_RESULT_CODE_ERROR)) {
+        ESP_LOGI("ppoes_example", "Handling sim800_handle_cops #2: %s", line);
         err = esp_modem_process_command_done(dce, MODEM_STATE_FAIL);
     } else if (!strncmp(line, "+COPS", strlen("+COPS"))) {
+        ESP_LOGI("ppoes_example", "Handling sim800_handle_cops #3: %s", line);
         /* there might be some random spaces in operator's name, we can not use sscanf to parse the result */
         /* strtok will break the string, we need to create a copy */
         size_t len = strlen(line);
@@ -212,6 +216,7 @@ static esp_err_t sim800_handle_cops(modem_dce_t *dce, const char *line)
             }
         }
         free(line_copy);
+        err = ESP_OK; // hotfix
     }
     return err;
 }
@@ -304,6 +309,7 @@ static esp_err_t sim800_set_working_mode(modem_dce_t *dce, modem_mode_t mode)
         DCE_CHECK(dte->send_cmd(dte, "ATD*99#\r", MODEM_COMMAND_TIMEOUT_MODE_CHANGE) == ESP_OK, "send command failed", err);
         DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "enter ppp mode failed", err);
         ESP_LOGD(DCE_TAG, "enter ppp mode ok");
+        vTaskDelay(5000 / portTICK_PERIOD_MS); // FIXME cannot remove, if there is no delay, we get no connection :(
         dce->mode = MODEM_PPP_MODE;
         break;
     default:
@@ -457,7 +463,9 @@ modem_dce_t *sim800_init(modem_dte_t *dte)
     sim800_dce->parent.power_down = sim800_power_down;
     sim800_dce->parent.deinit = sim800_deinit;
     /* Sync between DTE and DCE */
-    DCE_CHECK(esp_modem_dce_sync(&(sim800_dce->parent)) == ESP_OK, "sync failed", err_io);
+
+reinit:
+    DCE_CHECK(esp_modem_dce_sync(&(sim800_dce->parent)) == ESP_OK, "sync failed", reinit);
     /* Close echo */
     DCE_CHECK(esp_modem_dce_echo(&(sim800_dce->parent), false) == ESP_OK, "close echo mode failed", err_io);
     /* Get Module name */
